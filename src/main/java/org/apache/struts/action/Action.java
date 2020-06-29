@@ -34,6 +34,8 @@ import org.apache.struts.util.MessageResources;
 import org.apache.struts.util.ModuleUtils;
 import org.apache.struts.util.RequestUtils;
 import org.apache.struts.util.TokenProcessor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 
 /**
  * <p>An <strong>Action</strong> is an adapter between the contents of an incoming
@@ -67,6 +69,12 @@ import org.apache.struts.util.TokenProcessor;
  * @version $Rev: 164530 $ $Date: 2005-04-25 04:11:07 +0100 (Mon, 25 Apr 2005) $
  */
 public class Action {
+    @Autowired
+    protected ApplicationContext applicationContext;
+
+    public void setApplicationContext(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
 
     /**
      * <p>An instance of <code>TokenProcessor</code> to use for token functionality.</p>
@@ -187,16 +195,11 @@ public class Action {
      * @since Struts 1.1
      */
     public ActionForward execute(
-        ActionMapping mapping,
-        ActionForm form,
-        HttpServletRequest request,
-        HttpServletResponse response)
-        throws Exception {
+            ActionMapping mapping, ActionForm form, HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
 
         return null;
-
     }
-
 
     // ---------------------------------------------------- Protected Methods
 

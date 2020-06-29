@@ -72,6 +72,7 @@ import org.apache.struts.util.RequestUtils;
 import org.apache.struts.util.ServletContextWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.web.servlet.ViewResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
@@ -175,10 +176,12 @@ import org.xml.sax.SAXException;
         urlPatterns = {"*.do"})
 public class ActionServlet extends HttpServlet {
     @Autowired
-    ApplicationContext applicationContext;
+    protected ApplicationContext applicationContext;
+
+    @Autowired
+    private ViewResolver viewResolver;
 
     // ----------------------------------------------------- Instance Variables
-
 
     /**
      * <p>Comma-separated list of context-relative path(s) to our configuration
@@ -1206,7 +1209,8 @@ public class ActionServlet extends HttpServlet {
         if (processor == null) {
            processor = getRequestProcessor(config);
         }
-        processor.process(applicationContext, request, response);
+        processor.setApplicationContext(applicationContext);
+        processor.process(request, response);
 
     }
 

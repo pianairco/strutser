@@ -21,6 +21,7 @@ package org.apache.struts.action;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 
 import javax.servlet.RequestDispatcher;
@@ -42,7 +43,8 @@ import org.apache.struts.upload.MultipartRequestWrapper;
 import org.apache.struts.util.MessageResources;
 import org.apache.struts.util.RequestUtils;
 import org.springframework.context.ApplicationContext;
-import org.springframework.web.struts.DelegatingActionProxy;
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.ViewResolver;
 
 /**
  * <p><strong>RequestProcessor</strong> contains the processing logic that
@@ -56,6 +58,11 @@ import org.springframework.web.struts.DelegatingActionProxy;
  */
 public class RequestProcessor {
 
+    private ApplicationContext applicationContext;
+
+    public void setApplicationContext(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
 
     // ----------------------------------------------------- Manifest Constants
 
@@ -145,6 +152,17 @@ public class RequestProcessor {
         this.moduleConfig = moduleConfig;
     }
 
+    protected String determineActionBeanName(ActionMapping mapping) {
+        String prefix = mapping.getModuleConfig().getPrefix();
+        String path = mapping.getPath();
+        String beanName = prefix + path;
+        if (log.isDebugEnabled()) {
+            log.debug("DelegatingActionProxy with mapping path '" + path + "' and module prefix '" +
+                    prefix + "' delegating to Spring bean with name [" + beanName + "]");
+        }
+        beanName = beanName.startsWith("/") ? beanName.substring(1) : beanName;
+        return beanName;
+    }
 
     /**
      * <p>Process an <code>HttpServletRequest</code> and create the
@@ -157,8 +175,7 @@ public class RequestProcessor {
      * @exception IOException if an input/output error occurs
      * @exception ServletException if a processing exception occurs
      */
-    public void process(ApplicationContext applicationContext,
-                        HttpServletRequest request,
+    public void process(HttpServletRequest request,
                         HttpServletResponse response)
         throws IOException, ServletException {
 
@@ -230,14 +247,14 @@ public class RequestProcessor {
         }
 
         // Create or acquire the Action instance to process this request
-        Action action = processActionCreate(request, response, mapping);
+        String beanName = determineActionBeanName(mapping);
+        Action action = applicationContext.getBean(beanName, Action.class);
+
         if (action == null) {
             return;
         }
 
-        if (action instanceof DelegatingActionProxy) {
-            ((DelegatingActionProxy)action).setApplicationContext(applicationContext);
-        }
+        action.setApplicationContext(applicationContext);
 
         // Call the Action instance itself
         ActionForward forward =
@@ -391,7 +408,17 @@ public class RequestProcessor {
         if (forwardPath.startsWith("/")) {
             uri = RequestUtils.forwardURL(request, forward, null);    // get module relative uri
         } else {
-            uri = forwardPath;
+            ViewResolver viewResolver = applicationContext.getBean("viewResolver", ViewResolver.class);
+            try {
+                View view = viewResolver.resolveViewName(forwardPath, Locale.ENGLISH);
+                LinkedHashMap map = new LinkedHashMap<>();
+                map.put("namy", "lili");
+                view.render(map, request, response);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return;
+//            uri = forwardPath;
         }
         
         if (forward.getRedirect()) {
