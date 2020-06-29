@@ -20,12 +20,15 @@ package org.apache.struts.actions;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.struts.action.Action;
@@ -33,6 +36,7 @@ import org.apache.struts.action.ActionForm;
 import org.apache.struts.action.ActionForward;
 import org.apache.struts.action.ActionMapping;
 import org.apache.struts.util.MessageResources;
+import org.springframework.http.ResponseEntity;
 
 /**
  * <p>An abstract <strong>Action</strong> that dispatches to a public
@@ -122,6 +126,7 @@ public abstract class DispatchAction extends Action {
      * once per method name.
      */
     protected HashMap methods = new HashMap();
+    protected HashMap noViewMethods = new HashMap();
 
 
     /**
@@ -135,6 +140,10 @@ public abstract class DispatchAction extends Action {
                 HttpServletRequest.class,
                 HttpServletResponse.class};
 
+    protected Class[] noViewTypes =
+            {
+                    ActionForm.class,
+                    HttpServletRequest.class};
 
 
     // --------------------------------------------------------- Public Methods
@@ -266,8 +275,23 @@ public abstract class DispatchAction extends Action {
 
         ActionForward forward = null;
         try {
-            Object args[] = {mapping, form, request, response};
-            forward = (ActionForward) method.invoke(this, args);
+            if(method.getGenericReturnType().getTypeName()
+                    .equalsIgnoreCase(ActionForward.class.getName())) {
+                Object args[] = {mapping, form, request, response};
+                forward = (ActionForward) method.invoke(this, args);
+            } else if (method.getGenericReturnType().getTypeName()
+                    .equalsIgnoreCase(ResponseEntity.class.getName())) {
+                Object args[] = {form, request};
+                ResponseEntity responseEntity = (ResponseEntity) method.invoke(this, args);
+                response.setStatus(responseEntity.getStatusCodeValue());
+                ObjectMapper bean = applicationContext.getBean(ObjectMapper.class);
+                responseEntity.getHeaders().entrySet().stream().forEach(h -> {
+                    for (String v : h.getValue())
+                        response.addHeader(h.getKey(), v);
+                });
+                bean.writeValue(response.getOutputStream(), responseEntity.getBody());
+                return null;
+            }
 
         } catch(ClassCastException e) {
             String message =
@@ -343,9 +367,23 @@ public abstract class DispatchAction extends Action {
 
         synchronized(methods) {
             Method method = (Method) methods.get(name);
+            if (method == null)
+                method = (Method) noViewMethods.get(name);
             if (method == null) {
-                method = clazz.getMethod(name, types);
-                methods.put(name, method);
+                try {
+                    method = clazz.getMethod(name, types);
+                    methods.put(name, method);
+                } catch (Exception e) {
+
+                }
+            }
+            if (method == null) {
+                try {
+                    method = clazz.getMethod(name, noViewTypes);
+                    noViewMethods.put(name, method);
+                } catch (Exception e){
+
+                }
             }
             return (method);
         }
