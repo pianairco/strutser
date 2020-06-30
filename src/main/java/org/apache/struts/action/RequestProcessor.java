@@ -254,8 +254,6 @@ public class RequestProcessor {
             return;
         }
 
-        action.setApplicationContext(applicationContext);
-
         // Call the Action instance itself
         ActionForward forward =
             processActionPerform(request, response,

@@ -72,10 +72,6 @@ public class Action {
     @Autowired
     protected ApplicationContext applicationContext;
 
-    public void setApplicationContext(ApplicationContext applicationContext) {
-        this.applicationContext = applicationContext;
-    }
-
     /**
      * <p>An instance of <code>TokenProcessor</code> to use for token functionality.</p>
      */
