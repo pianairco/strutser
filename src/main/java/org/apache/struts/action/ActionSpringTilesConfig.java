@@ -15,7 +15,7 @@ public class ActionSpringTilesConfig {
 
         // TilesView 3
         viewResolver.setViewClass(TilesView.class);
-
+        viewResolver.setContentType("text/html;charset=UTF-8");
         return viewResolver;
     }
 
@@ -26,7 +26,7 @@ public class ActionSpringTilesConfig {
         // TilesView 3
         tilesConfigurer.setDefinitions("/WEB-INF/tiles.xml");
         tilesConfigurer.setCheckRefresh(true);
-
+        tilesConfigurer.setCompleteAutoload();
         return tilesConfigurer;
     }
 }

@@ -45,6 +45,7 @@ import org.apache.struts.util.RequestUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.view.UrlBasedViewResolver;
 
 /**
  * <p><strong>RequestProcessor</strong> contains the processing logic that
@@ -408,7 +409,7 @@ public class RequestProcessor {
         } else {
             ViewResolver viewResolver = applicationContext.getBean("viewResolver", ViewResolver.class);
             try {
-                View view = viewResolver.resolveViewName(forwardPath, Locale.ENGLISH);
+                View view = ((UrlBasedViewResolver)viewResolver).resolveViewName(forwardPath, Locale.ENGLISH);
                 LinkedHashMap map = new LinkedHashMap<>();
                 map.put("namy", "lili");
                 view.render(map, request, response);
