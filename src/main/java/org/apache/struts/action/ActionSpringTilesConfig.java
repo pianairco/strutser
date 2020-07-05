@@ -26,7 +26,7 @@ public class ActionSpringTilesConfig {
         // TilesView 3
         tilesConfigurer.setDefinitions("/WEB-INF/tiles.xml");
         tilesConfigurer.setCheckRefresh(true);
-        tilesConfigurer.setCompleteAutoload();
+        tilesConfigurer.setCompleteAutoload(true);
         return tilesConfigurer;
     }
 }
