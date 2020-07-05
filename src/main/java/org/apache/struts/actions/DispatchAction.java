@@ -18,16 +18,6 @@
 
 package org.apache.struts.actions;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,8 +25,24 @@ import org.apache.struts.action.Action;
 import org.apache.struts.action.ActionForm;
 import org.apache.struts.action.ActionForward;
 import org.apache.struts.action.ActionMapping;
+import org.apache.struts.annotation.RequestBodyType;
+import org.apache.struts.util.HttpRequestModel;
 import org.apache.struts.util.MessageResources;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Properties;
 
 /**
  * <p>An abstract <strong>Action</strong> that dispatches to a public
@@ -126,7 +132,6 @@ public abstract class DispatchAction extends Action {
      * once per method name.
      */
     protected HashMap methods = new HashMap();
-    protected HashMap noViewMethods = new HashMap();
 
 
     /**
@@ -144,6 +149,11 @@ public abstract class DispatchAction extends Action {
             {
                     ActionForm.class,
                     HttpServletRequest.class};
+
+    protected Class[] requestModelTypes =
+            {
+                    ActionForm.class,
+                    HttpRequestModel.class};
 
 
     // --------------------------------------------------------- Public Methods
@@ -281,8 +291,21 @@ public abstract class DispatchAction extends Action {
                 forward = (ActionForward) method.invoke(this, args);
             } else if (method.getGenericReturnType().getTypeName()
                     .equalsIgnoreCase(ResponseEntity.class.getName())) {
-                Object args[] = {form, request};
-                ResponseEntity responseEntity = (ResponseEntity) method.invoke(this, args);
+                RequestBodyType annotation = method.getAnnotation(RequestBodyType.class);
+                ResponseEntity responseEntity = null;
+                if(annotation != null) {
+                    if(method.getParameters().length == 2 &&
+                            method.getParameterTypes()[1].equals(HttpRequestModel.class)) {
+                        HttpRequestModel httpRequestModel = createHttpRequestModel(request, annotation.type());
+                        Object args[] = {form, httpRequestModel};
+                        responseEntity = (ResponseEntity) method.invoke(this, args);
+                    } else
+                        return null;
+
+                } else {
+                    Object args[] = {form, request};
+                    responseEntity = (ResponseEntity) method.invoke(this, args);
+                }
                 response.setStatus(responseEntity.getStatusCodeValue());
                 ObjectMapper bean = applicationContext.getBean(ObjectMapper.class);
                 responseEntity.getHeaders().entrySet().stream().forEach(h -> {
@@ -321,6 +344,36 @@ public abstract class DispatchAction extends Action {
 
         // Return the returned ActionForward instance
         return (forward);
+    }
+
+    public HttpRequestModel createHttpRequestModel(HttpServletRequest request, Class type)
+            throws IOException {
+        HttpMethod httpMethod = HttpMethod.resolve(request.getMethod());
+        Object object = null;
+        if(httpMethod == HttpMethod.POST || httpMethod == HttpMethod.PUT) {
+            ObjectMapper objectMapper = applicationContext
+                    .getBean("objectMapper", ObjectMapper.class);
+            object = objectMapper.readValue(request.getInputStream(), type);
+        }
+        HttpHeaders httpHeaders = new HttpHeaders();
+
+        Enumeration<String> headerNames = request.getHeaderNames();
+
+        while (headerNames.hasMoreElements()) {
+            String headerName = headerNames.nextElement();
+            Enumeration<String> headers = request.getHeaders(headerName);
+            while (headers.hasMoreElements()) {
+                String headerValue = headers.nextElement();
+                httpHeaders.add(headerName, headerValue);
+            }
+        }
+
+        Properties properties = new Properties();
+        properties.putAll(request.getParameterMap());
+        request.getRemoteHost();
+        return new HttpRequestModel(httpMethod,
+                request.getRemoteHost(),
+                httpHeaders, properties, object);
     }
 
     /**
@@ -368,7 +421,7 @@ public abstract class DispatchAction extends Action {
         synchronized(methods) {
             Method method = (Method) methods.get(name);
             if (method == null)
-                method = (Method) noViewMethods.get(name);
+                method = (Method) methods.get(name);
             if (method == null) {
                 try {
                     method = clazz.getMethod(name, types);
@@ -380,7 +433,15 @@ public abstract class DispatchAction extends Action {
             if (method == null) {
                 try {
                     method = clazz.getMethod(name, noViewTypes);
-                    noViewMethods.put(name, method);
+                    methods.put(name, method);
+                } catch (Exception e){
+
+                }
+            }
+            if(method == null) {
+                try {
+                    method = clazz.getMethod(name, requestModelTypes);
+                    methods.put(name, method);
                 } catch (Exception e){
 
                 }
